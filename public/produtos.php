@@ -1,6 +1,6 @@
 <?php
 if (session_status() == PHP_SESSION_NONE) {
-  session_start();
+    session_start();
 }
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/models/Produto.php';
@@ -11,8 +11,11 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
-$produtoModel = new Produto();
-$produtos = $produtoModel->listar();
+// variável $produtos deve ser fornecida pelo controller (index)
+if (!isset($produtos)) {
+    $produtoModel = new Produto();
+    $produtos = $produtoModel->listar();
+}
 ?>
 
 <!DOCTYPE html>
@@ -42,86 +45,19 @@ $produtos = $produtoModel->listar();
       font-weight: 600;
       margin-bottom: 40px;
     }
-    .sidebar a {
-      color: #ccc;
-      text-decoration: none;
-      display: block;
-      padding: 10px 0;
-      transition: color 0.3s;
-    }
-    .sidebar a:hover {
-      color: #007bff;
-    }
-    .main-content {
-      padding: 40px;
-      flex-grow: 1;
-    }
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-    .table {
-      background-color: #1f1f1f;
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .table thead th {
-      background-color: #2a2a2a;
-      color: #fff;
-      border-bottom: 1px solid #333;
-    }
-    .table tbody tr:hover {
-      background-color: #2c2c2c;
-    }
-    .btn-warning {
-      background-color: #ffc107;
-      border: none;
-      color: #000;
-    }
-    .btn-warning:hover {
-      background-color: #e0a800;
-    }
-    .btn-danger {
-      background-color: #dc3545;
-      border: none;
-    }
-    .btn-danger:hover {
-      background-color: #bb2d3b;
-    }
-    .btn-primary {
-      background-color: #007bff;
-      border: none;
-    }
-    .btn-primary:hover {
-      background-color: #0069d9;
-    }
-    .modal-content {
-      background-color: #1e1e1e;
-      color: #fff;
-    }
-    .form-control {
-      background-color: #2c2c2c;
-      border-color: #444;
-      color: #fff;
-    }
-    .form-control:focus {
-      background-color: #2c2c2c;
-      border-color: #007bff;
-      color: #fff;
-      box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
-    }
-    .footer {
-      background-color: #1e1e1e;
-      color: #ccc;
-      text-align: center;
-      padding: 15px 0;
-      position: fixed;
-      bottom: 0;
-      width: 100%;
-      border-top: 1px solid #333;
-    }
+    .sidebar a { color: #ccc; text-decoration: none; display: block; padding: 10px 0; }
+    .main-content { padding: 40px; flex-grow: 1; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .table { background-color: #1f1f1f; border-radius: 10px; overflow: hidden; }
+    .table thead th { background-color: #2a2a2a; color: #fff; border-bottom: 1px solid #333; }
+    .table tbody tr:hover { background-color: #2c2c2c; }
+    .btn-warning { background-color: #ffc107; border: none; color: #000; }
+    .btn-danger { background-color: #dc3545; border: none; }
+    .btn-primary { background-color: #007bff; border: none; }
+    .modal-content { background-color: #1e1e1e; color: #fff; }
+    .form-control { background-color: #2c2c2c; border-color: #444; color: #fff; }
+    .form-control:focus { background-color: #2c2c2c; border-color: #007bff; color: #fff; box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25); }
+    .footer { background-color: #1e1e1e; color: #ccc; text-align: center; padding: 15px 0; position: fixed; bottom: 0; width: 100%; border-top: 1px solid #333; }
   </style>
 </head>
 <body>
@@ -130,17 +66,43 @@ $produtos = $produtoModel->listar();
     <aside class="sidebar">
       <h4>Portal de Compras</h4>
       <a href="?route=produtos" class="active">Produtos</a>
-      <a href="../public/login.php">Sair</a>
+      <a href="?route=fornecedores" class="active">Fornecedores</a>
+      <a href="logout.php">Sair</a>
     </aside>
 
     <main class="main-content">
-      <div class="top-bar">
-        <h2 class="fw-semibold">Produtos</h2>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCadastroProduto">Incluir Cadastro</button>
+      <div class="top-bar d-flex align-items-center justify-content-between gap-3">
+        <div>
+          <h2 class="fw-semibold mb-0">Produtos</h2>
+          <?php if (!empty($_GET['q'])): ?>
+            <small class="text-muted">Resultados para: "<?= htmlspecialchars($_GET['q']) ?>"</small>
+          <?php endif; ?>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <form class="d-flex" method="GET" action="?">
+            <input type="hidden" name="route" value="produtos" />
+            <input
+              class="form-control form-control-sm me-2"
+              type="search"
+              name="q"
+              placeholder="Pesquisar descrição ou código..."
+              value="<?= isset($_GET['q']) ? htmlspecialchars($_GET['q']) : '' ?>"
+              aria-label="Pesquisar"
+              style="max-width:320px;"
+            />
+            <button class="btn btn-sm btn-primary" type="submit">Buscar</button>
+            <?php if (!empty($_GET['q'])): ?>
+              <a href="?route=produtos" class="btn btn-sm btn-secondary ms-2">Limpar</a>
+            <?php endif; ?>
+          </form>
+
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCadastroProduto">Incluir Cadastro</button>
+        </div>
       </div>
 
       <div class="table-responsive">
-        <table class="table table-dark table-hover">
+        <table class="table table-dark table-hover w-100">
           <thead>
             <tr>
               <th>#</th>
@@ -286,6 +248,9 @@ $produtos = $produtoModel->listar();
       const button = $(event.relatedTarget);
       $('#excluir-id').val(button.data('id'));
     });
+
+    // Se preferir submeter via action em um único endpoint, seu router/web.php deve ler $_POST['action']
+    // e chamar o controller adequado (store/update/delete). Se quiser eu te mostro como fazer o router.
   </script>
 </body>
 </html>

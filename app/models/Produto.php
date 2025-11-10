@@ -8,9 +8,27 @@ class Produto {
         $this->conn = Database::connect();
     }
 
-    public function listar() {
-        $stmt = $this->conn->query("SELECT * FROM produtos ORDER BY id DESC");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    /**
+     * Lista produtos. Se $q for passado, filtra por descricao ou codigo.
+     *
+     * @param string|null $q
+     * @return array
+     */
+    public function listar($q = null) {
+        // tratamento seguro do parâmetro
+        if ($q === null || trim($q) === '') {
+            $stmt = $this->conn->query("SELECT * FROM produtos ORDER BY id DESC");
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $term = '%' . $q . '%';
+            $stmt = $this->conn->prepare("
+                SELECT * FROM produtos
+                WHERE descricao LIKE ? OR codigo LIKE ?
+                ORDER BY id DESC
+            ");
+            $stmt->execute([$term, $term]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 
     public function criar($descricao, $codigo) {
