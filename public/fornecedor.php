@@ -117,8 +117,8 @@ if (!isset($fornecedores)) {
     <aside class="sidebar">
       <h4>Portal de Compras</h4>
       <a href="?route=produtos">Produtos</a>
-      <a href="?route=fornecedores" class="active">Fornecedores</a>
-      <a href="?route=logout">Sair</a>
+      <a href="?route=fornecedor" class="active">Fornecedores</a>
+      <a href="logout.php">Sair</a>
     </aside>
 
     <main class="main-content">
@@ -132,7 +132,7 @@ if (!isset($fornecedores)) {
 
         <div class="d-flex align-items-center gap-2">
           <form class="d-flex" method="GET" action="?">
-            <input type="hidden" name="route" value="fornecedores" />
+            <input type="hidden" name="route" value="fornecedor" />
             <input
               class="form-control form-control-sm me-2"
               type="search"
@@ -144,7 +144,7 @@ if (!isset($fornecedores)) {
             />
             <button class="btn btn-sm btn-primary" type="submit">Buscar</button>
             <?php if (!empty($_GET['q'])): ?>
-              <a href="?route=fornecedores" class="btn btn-sm btn-secondary ms-2">Limpar</a>
+              <a href="?route=fornecedor" class="btn btn-sm btn-secondary ms-2">Limpar</a>
             <?php endif; ?>
           </form>
 
@@ -208,7 +208,7 @@ if (!isset($fornecedores)) {
   <!-- MODAL CADASTRO -->
   <div class="modal fade" id="modalCadastroFornecedor" tabindex="-1">
     <div class="modal-dialog">
-      <form method="POST" action="?route=fornecedores">
+      <form method="POST" action="?route=fornecedor">
         <input type="hidden" name="action" value="create">
         <div class="modal-content">
           <div class="modal-header">
@@ -249,7 +249,7 @@ if (!isset($fornecedores)) {
   <!-- MODAL EDITAR -->
   <div class="modal fade" id="modalEditarFornecedor" tabindex="-1">
     <div class="modal-dialog">
-      <form method="POST" action="?route=fornecedores">
+      <form method="POST" action="?route=fornecedor">
         <input type="hidden" name="action" value="update">
         <input type="hidden" id="editar-id" name="id">
         <div class="modal-content">
@@ -291,7 +291,7 @@ if (!isset($fornecedores)) {
   <!-- MODAL EXCLUIR -->
   <div class="modal fade" id="modalExcluirFornecedor" tabindex="-1">
     <div class="modal-dialog">
-      <form method="POST" action="?route=fornecedores">
+      <form method="POST" action="?route=fornecedor">
         <input type="hidden" name="action" value="delete">
         <input type="hidden" id="excluir-id" name="id">
         <div class="modal-content">

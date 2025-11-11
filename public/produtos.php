@@ -66,7 +66,7 @@ if (!isset($produtos)) {
     <aside class="sidebar">
       <h4>Portal de Compras</h4>
       <a href="?route=produtos" class="active">Produtos</a>
-      <a href="?route=fornecedores" class="active">Fornecedores</a>
+      <a href="?route=fornecedor" class="active">Fornecedores</a>
       <a href="logout.php">Sair</a>
     </aside>
 
