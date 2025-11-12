@@ -1,7 +1,5 @@
 <?php
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/models/Produto.php';
 
@@ -67,7 +65,7 @@ if (!isset($produtos)) {
       <h4>Portal de Compras</h4>
       <a href="?route=produtos" class="active">Produtos</a>
       <a href="?route=fornecedor" class="active">Fornecedores</a>
-      <a href="logout.php">Sair</a>
+      <a href="?route=logout">Sair</a>
     </aside>
 
     <main class="main-content">
