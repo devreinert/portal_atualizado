@@ -64,9 +64,29 @@ if (isset($_GET['route'])) {
             }
             break;
 
+            case 'cotacoes':
+                require_once __DIR__ . '/../app/controllers/CotacaoController.php';
+                $controller = new CotacaoController();
+    
+                if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                    if (isset($_POST['action'])) {
+                        switch ($_POST['action']) {
+                            case 'create': 
+                                $controller->store(); 
+                                break;
+                        }
+                    }
+                } else {
+                    $controller->index();
+                }
+                break;
+    
+
         default:
             echo "Rota inválida!";
             break;
+
+
     }
 }
 ?>
