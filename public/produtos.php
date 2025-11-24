@@ -65,6 +65,7 @@ if (!isset($produtos)) {
       <h4>Portal de Compras</h4>
       <a href="?route=produtos" class="active">Produtos</a>
       <a href="?route=fornecedor" class="active">Fornecedores</a>
+      <a href="?route=cotacoes" class="active">Cotações</a>
       <a href="?route=logout">Sair</a>
     </aside>
 

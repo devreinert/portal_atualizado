@@ -11,9 +11,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'store') {
 }
 
 // Carrega dados para exibir na view
-$cotacoes = $controller->model->all();
-$fornecedores = $controller->conn->query("SELECT id, nome FROM fornecedores ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
-$produtos = $controller->conn->query("SELECT id, nome FROM produtos ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+$cotacoes = $controller->$model->all();
+$fornecedores = $controller->$conn->query("SELECT id, nome FROM fornecedores ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+$produtos = $controller->$conn->query("SELECT id, nome FROM produtos ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -69,7 +69,7 @@ $produtos = $controller->conn->query("SELECT id, nome FROM produtos ORDER BY nom
                                 <td><?= $c['criado_em'] ?></td>
                                 <td>
                                     <?php
-                                        $itens = $controller->model->itens($c['id']);
+                                        $itens = $controller->$model->itens($c['id']);
                                         foreach ($itens as $item) {
                                             echo $item['produto_nome'] . " x " . $item['quantidade'] . "<br>";
                                         }
