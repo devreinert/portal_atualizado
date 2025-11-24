@@ -12,70 +12,51 @@ class Cotacao {
      * Retorna todas as cotações cadastradas
      */
     public function all() {
-        $sql = "
-            SELECT c.id,
-                   c.fornecedor_id,
-                   c.criado_em,
+        $stmt = $this->conn->prepare("
+            SELECT c.*,
                    f.nome AS fornecedor_nome
             FROM cotacoes c
             LEFT JOIN fornecedores f ON f.id = c.fornecedor_id
-            ORDER BY c.criado_em DESC
-        ";
-
-        $stmt = $this->conn->query($sql);
+            ORDER BY c.id DESC
+        ");
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
-     * Retorna uma cotação específica
+     * Retorna uma cotação por id
      */
     public function find($id) {
-        $stmt = $this->conn->prepare("SELECT * FROM cotacoes WHERE id = ?");
+        $stmt = $this->conn->prepare("
+            SELECT c.*,
+                   f.nome AS fornecedor_nome
+            FROM cotacoes c
+            LEFT JOIN fornecedores f ON f.id = c.fornecedor_id
+            WHERE c.id = ?
+            LIMIT 1
+        ");
         $stmt->execute([$id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     /**
-     * Cria uma cotação com seus itens
+     * Insere uma nova cotação
      */
-    public function create($fornecedor_id, $itens) {
-        try {
-            $this->conn->beginTransaction();
-
-            // Insere a cotação
-            $stmt = $this->conn->prepare("INSERT INTO cotacoes (fornecedor_id) VALUES (?)");
-            $stmt->execute([$fornecedor_id]);
-
-            $cotacao_id = $this->conn->lastInsertId();
-
-            // Insere os itens da cotação
-            $stmtItem = $this->conn->prepare("
-                INSERT INTO cotacao_itens (cotacao_id, produto_id, quantidade)
-                VALUES (?,?,?)
-            ");
-
-            foreach ($itens as $item) {
-                $produto_id  = (int) $item['produto_id'];
-                $quantidade  = (int) $item['quantidade'];
-
-                if ($produto_id <= 0 || $quantidade <= 0) {
-                    continue; // ignora itens inválidos
-                }
-
-                $stmtItem->execute([$cotacao_id, $produto_id, $quantidade]);
-            }
-
-            $this->conn->commit();
-            return $cotacao_id;
-
-        } catch (Exception $e) {
-            $this->conn->rollBack();
-            throw $e;
-        }
+    public function store($data) {
+        $stmt = $this->conn->prepare("
+            INSERT INTO cotacoes (fornecedor_id, usuario_id, data_cotacao, observacoes)
+            VALUES (?, ?, ?, ?)
+        ");
+        return $stmt->execute([
+            $data['fornecedor_id'] ?? null,
+            $data['usuario_id'] ?? null,
+            $data['data_cotacao'] ?? date('Y-m-d'),
+            $data['observacoes'] ?? null
+        ]);
     }
 
     /**
-     * Retorna itens de uma cotação
+     * Retorna os itens de uma cotação
      */
     public function itens($cotacao_id) {
         $stmt = $this->conn->prepare("
@@ -92,3 +73,4 @@ class Cotacao {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
+?>

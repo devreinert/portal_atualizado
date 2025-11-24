@@ -2,18 +2,26 @@
 session_start();
 
 require_once __DIR__ . '/../app/controllers/CotacaoController.php';
+
 $controller = new CotacaoController();
 
-// Decide ação
+// Se a ação for salvar
 if (isset($_GET['action']) && $_GET['action'] === 'store') {
     $controller->store();
     exit;
 }
 
-// Carrega dados para exibir na view
+// Carrega dados pela lógica correta do controller/model
 $cotacoes = $controller->$model->all();
-$fornecedores = $controller->$conn->query("SELECT id, nome FROM fornecedores ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
-$produtos = $controller->$conn->query("SELECT id, nome FROM produtos ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+
+// Carregar fornecedores
+$db = Database::connect();
+$fornecedores = $db->query("SELECT id, nome FROM fornecedores ORDER BY nome")
+                   ->fetchAll(PDO::FETCH_ASSOC);
+
+// Carregar produtos
+$produtos = $db->query("SELECT id, nome FROM produtos ORDER BY nome")
+               ->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -66,7 +74,7 @@ $produtos = $controller->$conn->query("SELECT id, nome FROM produtos ORDER BY no
                             <tr>
                                 <td><?= $c['id'] ?></td>
                                 <td><?= $c['fornecedor_nome'] ?></td>
-                                <td><?= $c['criado_em'] ?></td>
+                                <td><?= $c['data_cotacao'] ?></td>
                                 <td>
                                     <?php
                                         $itens = $controller->$model->itens($c['id']);
@@ -149,7 +157,6 @@ $produtos = $controller->$conn->query("SELECT id, nome FROM produtos ORDER BY no
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-// adicionar linhas
 document.getElementById("addProduto").addEventListener("click", function () {
     const wrapper = document.getElementById("itensWrapper");
     const row = wrapper.firstElementChild.cloneNode(true);
@@ -166,7 +173,6 @@ document.getElementById("addProduto").addEventListener("click", function () {
     wrapper.appendChild(row);
 });
 
-// remover linha inicial
 document.querySelector(".remove-row").addEventListener("click", function () {
     const rows = document.querySelectorAll(".cotacao-row");
     if (rows.length > 1) {
