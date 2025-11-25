@@ -1,26 +1,39 @@
 <?php
-session_start();
+// public/cotacoes.php
 
+// Evita chamar session_start() novamente
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Carrega o controller (que por sua vez carrega o model)
 require_once __DIR__ . '/../app/controllers/CotacaoController.php';
 
+// Instancia controller
 $controller = new CotacaoController();
 
-// Se a ação for salvar
-if (isset($_GET['action']) && $_GET['action'] === 'store') {
+// Se a página for usada para salvar via query string action=store ou via POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' || (isset($_GET['action']) && $_GET['action'] === 'store')) {
     $controller->store();
     exit;
 }
 
-// Carrega dados pela lógica correta do controller/model
-$cotacoes = $controller->$model->all();
+// --- BUSCA DADOS PARA A VIEW ---
+// Use a propriedade pública model do controller (não $controller->$model)
+$cotacoes = $controller->model->all();
 
-// Carregar fornecedores
+// Para fornecedores/produtos usamos Database::connect() e aliasamos as colunas
+require_once __DIR__ . '/../app/models/Cotacao.php';
+require_once __DIR__ . '/../config/database.php';
+
 $db = Database::connect();
-$fornecedores = $db->query("SELECT id, nome FROM fornecedores ORDER BY nome")
+
+// Fornecedores: seu schema tem 'nome_empresa' -> alias para 'nome' (compatibilidade com views)
+$fornecedores = $db->query("SELECT id, nome_empresa AS nome FROM fornecedores ORDER BY nome_empresa")
                    ->fetchAll(PDO::FETCH_ASSOC);
 
-// Carregar produtos
-$produtos = $db->query("SELECT id, nome FROM produtos ORDER BY nome")
+// Produtos: seu schema tem 'descricao' -> alias para 'nome'
+$produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY descricao")
                ->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
@@ -72,14 +85,18 @@ $produtos = $db->query("SELECT id, nome FROM produtos ORDER BY nome")
                     <tbody>
                         <?php foreach ($cotacoes as $c): ?>
                             <tr>
-                                <td><?= $c['id'] ?></td>
-                                <td><?= $c['fornecedor_nome'] ?></td>
-                                <td><?= $c['data_cotacao'] ?></td>
+                                <td><?= htmlspecialchars($c['id']) ?></td>
+                                <td><?= htmlspecialchars($c['fornecedor_nome'] ?? ($c['nome'] ?? '-')) ?></td>
+                                <td><?= htmlspecialchars($c['criado_em'] ?? $c['data_cotacao'] ?? '') ?></td>
                                 <td>
                                     <?php
-                                        $itens = $controller->$model->itens($c['id']);
-                                        foreach ($itens as $item) {
-                                            echo $item['produto_nome'] . " x " . $item['quantidade'] . "<br>";
+                                        $itens = $controller->model->itens($c['id']);
+                                        if (!empty($itens)) {
+                                            foreach ($itens as $item) {
+                                                echo htmlspecialchars(($item['produto_nome'] ?? $item['nome'] ?? $item['descricao'] ?? '-')) . " x " . (int)$item['quantidade'] . "<br>";
+                                            }
+                                        } else {
+                                            echo '-';
                                         }
                                     ?>
                                 </td>
@@ -110,7 +127,7 @@ $produtos = $db->query("SELECT id, nome FROM produtos ORDER BY nome")
             <select name="fornecedor_id" class="form-select" required>
                 <option value="">Selecione...</option>
                 <?php foreach ($fornecedores as $f): ?>
-                    <option value="<?= $f['id'] ?>"><?= $f['nome'] ?></option>
+                    <option value="<?= htmlspecialchars($f['id']) ?>"><?= htmlspecialchars($f['nome']) ?></option>
                 <?php endforeach; ?>
             </select>
 
@@ -126,7 +143,7 @@ $produtos = $db->query("SELECT id, nome FROM produtos ORDER BY nome")
                             <select name="produto_id[]" class="form-select" required>
                                 <option value="">Selecione o produto...</option>
                                 <?php foreach ($produtos as $p): ?>
-                                    <option value="<?= $p['id'] ?>"><?= $p['nome'] ?></option>
+                                    <option value="<?= htmlspecialchars($p['id']) ?>"><?= htmlspecialchars($p['nome']) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -157,29 +174,38 @@ $produtos = $db->query("SELECT id, nome FROM produtos ORDER BY nome")
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+// adicionar linhas
 document.getElementById("addProduto").addEventListener("click", function () {
     const wrapper = document.getElementById("itensWrapper");
     const row = wrapper.firstElementChild.cloneNode(true);
 
-    row.querySelector("select").selectedIndex = 0;
-    row.querySelector("input").value = "";
+    // reset values safely
+    const sel = row.querySelector("select");
+    if (sel) sel.selectedIndex = 0;
+    const input = row.querySelector("input[type='number']");
+    if (input) input.value = "";
 
-    row.querySelector(".remove-row").addEventListener("click", function () {
-        if (document.querySelectorAll(".cotacao-row").length > 1) {
-            row.remove();
-        }
-    });
+    // rebind remover
+    const btn = row.querySelector(".remove-row");
+    if (btn) {
+        btn.addEventListener("click", function () {
+            const rows = document.querySelectorAll(".cotacao-row");
+            if (rows.length > 1) this.closest(".cotacao-row").remove();
+        });
+    }
 
     wrapper.appendChild(row);
 });
 
-document.querySelector(".remove-row").addEventListener("click", function () {
-    const rows = document.querySelectorAll(".cotacao-row");
-    if (rows.length > 1) {
-        this.closest(".cotacao-row").remove();
-    }
+// bind remover para a linha inicial
+document.querySelectorAll(".remove-row").forEach(function(btn){
+    btn.addEventListener("click", function () {
+        const rows = document.querySelectorAll(".cotacao-row");
+        if (rows.length > 1) this.closest(".cotacao-row").remove();
+    });
 });
 </script>
 
 </body>
 </html>
+

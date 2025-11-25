@@ -14,7 +14,7 @@ class Cotacao {
     public function all() {
         $stmt = $this->conn->prepare("
             SELECT c.*,
-                   f.nome AS fornecedor_nome
+                   f.nome_empresa AS fornecedor_nome
             FROM cotacoes c
             LEFT JOIN fornecedores f ON f.id = c.fornecedor_id
             ORDER BY c.id DESC
@@ -29,7 +29,7 @@ class Cotacao {
     public function find($id) {
         $stmt = $this->conn->prepare("
             SELECT c.*,
-                   f.nome AS fornecedor_nome
+                   f.nome_empresa AS fornecedor_nome
             FROM cotacoes c
             LEFT JOIN fornecedores f ON f.id = c.fornecedor_id
             WHERE c.id = ?
@@ -40,18 +40,16 @@ class Cotacao {
     }
 
     /**
-     * Insere uma nova cotação
+     * Insere uma nova cotação compatível com o schema atual (fornecedor_id, criado_em)
+     * Se você tiver outras colunas (ex: usuario_id, observacoes), ajuste aqui.
      */
     public function store($data) {
         $stmt = $this->conn->prepare("
-            INSERT INTO cotacoes (fornecedor_id, usuario_id, data_cotacao, observacoes)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO cotacoes (fornecedor_id, criado_em)
+            VALUES (?, NOW())
         ");
         return $stmt->execute([
-            $data['fornecedor_id'] ?? null,
-            $data['usuario_id'] ?? null,
-            $data['data_cotacao'] ?? date('Y-m-d'),
-            $data['observacoes'] ?? null
+            $data['fornecedor_id'] ?? null
         ]);
     }
 
@@ -62,7 +60,7 @@ class Cotacao {
         $stmt = $this->conn->prepare("
             SELECT ci.id,
                    ci.produto_id,
-                   p.nome AS produto_nome,
+                   p.descricao AS produto_nome,
                    ci.quantidade
             FROM cotacao_itens ci
             LEFT JOIN produtos p ON p.id = ci.produto_id
