@@ -114,7 +114,7 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
 <div class="modal fade" id="modalCotacao" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <form method="post" action="cotacoes.php?action=store">
+    <form method="POST" action="?route=cotacoes">
 
         <div class="modal-header">
           <h5 class="modal-title">Iniciar Cotação</h5>

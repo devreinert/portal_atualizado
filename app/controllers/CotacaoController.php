@@ -46,6 +46,7 @@ class CotacaoController {
                        ->fetchAll(PDO::FETCH_ASSOC);
 
         require_once __DIR__ . '/../views/cotacoes/create.php';
+        header("Location: ?route=cotacoes");
     }
 
     /**
@@ -57,56 +58,51 @@ class CotacaoController {
      */
     public function store() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: /cotacoes');
+            header('Location: ?route=cotacoes');
             exit;
         }
-
+    
         $fornecedorId = $_POST['fornecedor_id'] ?? null;
         $produtos = $_POST['produto_id'] ?? [];
         $qtds = $_POST['quantidade'] ?? [];
-
+    
         if (empty($fornecedorId)) {
             $_SESSION['flash_error'] = 'Fornecedor obrigatório.';
-            header('Location: /cotacoes');
+            header('Location: ?route=cotacoes');
             exit;
         }
-
+    
         $db = Database::connect();
-
+    
         try {
-            // inicia transação: insere cotação e itens
             $db->beginTransaction();
-
-            // Inserir cotação: tabela conforme seu schema (fornecedor_id, criado_em)
+    
             $stmt = $db->prepare("INSERT INTO cotacoes (fornecedor_id, criado_em) VALUES (?, NOW())");
             $stmt->execute([$fornecedorId]);
-
-            // pega id da cotação inserida
+    
             $cotacaoId = $db->lastInsertId();
-
-            // inserir itens, se houver
+    
             if (!empty($produtos) && is_array($produtos)) {
                 $stmtItem = $db->prepare("INSERT INTO cotacao_itens (cotacao_id, produto_id, quantidade) VALUES (?, ?, ?)");
                 $count = max(count($produtos), count($qtds));
                 for ($i = 0; $i < $count; $i++) {
                     $pid = $produtos[$i] ?? null;
-                    $qt = $qtds[$i] ?? 0;
-                    // validar mínimo: id do produto e quantidade positiva
+                    $qt  = $qtds[$i] ?? 0;
+    
                     if (!empty($pid) && (int)$qt > 0) {
                         $stmtItem->execute([$cotacaoId, $pid, (int)$qt]);
                     }
                 }
             }
-
+    
             $db->commit();
             $_SESSION['flash_success'] = 'Cotação criada com sucesso.';
         } catch (Exception $e) {
             $db->rollBack();
-            // registrar mensagem de erro (não vaze dados sensíveis)
             $_SESSION['flash_error'] = 'Erro ao criar cotação: ' . $e->getMessage();
         }
-
-        header('Location: /cotacoes');
+    
+        header('Location: ?route=cotacoes');
         exit;
     }
 
@@ -117,7 +113,7 @@ class CotacaoController {
         $cotacao = $this->model->find($id);
         if (!$cotacao) {
             $_SESSION['flash_error'] = 'Cotação não encontrada.';
-            header('Location: /cotacoes');
+            header('Location: ?route=cotacoes');
             exit;
         }
 
@@ -150,7 +146,7 @@ class CotacaoController {
             $_SESSION['flash_error'] = 'Erro ao remover cotação: ' . $e->getMessage();
         }
 
-        header('Location: /cotacoes');
+        header('Location: ?route=cotacoes');
         exit;
     }
 }

@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../app/controllers/LoginController.php';
 require_once __DIR__ . '/../app/controllers/ProdutoController.php';
 require_once __DIR__ . '/../app/controllers/FornecedorController.php';
+require_once __DIR__ . '/../app/controllers/CotacaoController.php';
 
 
 $controller = new LoginController();
@@ -65,21 +66,17 @@ if (isset($_GET['route'])) {
             break;
 
             case 'cotacoes':
-                require_once __DIR__ . '/../app/controllers/CotacaoController.php';
                 $controller = new CotacaoController();
     
                 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                    if (isset($_POST['action'])) {
-                        switch ($_POST['action']) {
-                            case 'create': 
-                                $controller->store(); 
-                                break;
-                        }
-                    }
+                    // qualquer POST em cotacoes chama o store()
+                    $controller->store();
                 } else {
+                    // GET mostra o CRUD/listagem
                     $controller->index();
                 }
                 break;
+    
     
 
         default:
