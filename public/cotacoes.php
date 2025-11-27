@@ -5,31 +5,208 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Redireciona para login se não estiver logado
+if (!isset($_SESSION['usuario_id'])) {
+    header("Location: ?route=login");
+    exit;
+}
+
 // Aqui NÃO instanciamos controller nem chamamos store/index,
 // isso já foi feito pelo routes/web.php + CotacaoController::index()
 // e as variáveis abaixo DEVEM vir do controller:
 // $cotacoes, $itensPorCotacao, $fornecedores, $produtos
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <title>Cotações</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <style>
+        body {
+          font-family: 'Poppins', sans-serif;
+          background: radial-gradient(circle at top left, #1f2933, #050608 55%);
+          color: #fff;
+          min-height: 100vh;
+          margin: 0;
+        }
+        .sidebar {
+          background: linear-gradient(180deg, #10141c, #050608);
+          min-height: 100vh;
+          width: 260px;
+          padding: 30px 20px;
+          border-right: 1px solid rgba(255,255,255,0.05);
+        }
+        .sidebar h4 {
+          color: #0d6efd;
+          font-weight: 600;
+          margin-bottom: 40px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .sidebar h4 i {
+          font-size: 1.4rem;
+        }
+        .sidebar a {
+          color: #aaa;
+          text-decoration: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 0;
+          border-radius: 8px;
+          padding-left: 4px;
+          transition: all 0.2s;
+          font-size: 0.95rem;
+        }
+        .sidebar a i {
+          font-size: 1.1rem;
+        }
+        .sidebar a.active,
+        .sidebar a:hover {
+          color: #fff;
+          background-color: rgba(13,110,253,0.15);
+          padding-left: 8px;
+        }
+        .main-content {
+          padding: 40px;
+          flex-grow: 1;
+        }
+        .top-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 30px;
+        }
+        .top-bar h2 i {
+          color: #0d6efd;
+          margin-right: 8px;
+        }
+        .table {
+          background-color: #111827;
+          border-radius: 14px;
+          overflow: hidden;
+          border: 1px solid rgba(148,163,184,0.25);
+        }
+        .table thead th {
+          background-color: #020617;
+          color: #e5e7eb;
+          border-bottom: 1px solid #1f2937;
+          font-weight: 500;
+          font-size: 0.9rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .table tbody tr {
+          transition: background-color 0.15s, transform 0.05s;
+        }
+        .table tbody tr:hover {
+          background-color: #020617;
+          transform: translateY(-1px);
+        }
+        tr.clicavel { cursor:pointer; }
+        .badge-status {
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-size: 0.75rem;
+        }
+        .btn-primary,
+        .btn-danger,
+        .btn-secondary,
+        .btn-success,
+        .btn-outline-danger {
+          border-radius: 999px;
+        }
+        .btn-primary {
+          background: linear-gradient(135deg, #2563eb, #4f46e5);
+          border: none;
+        }
+        .btn-primary:hover {
+          background: linear-gradient(135deg, #1d4ed8, #4338ca);
+        }
+        .btn-success {
+          background: #16a34a;
+          border: none;
+        }
+        .btn-success:hover {
+          background: #15803d;
+        }
+        .btn-outline-danger {
+          border-color: #dc2626;
+          color: #fecaca;
+        }
+        .btn-outline-danger:hover {
+          background-color: #dc2626;
+          color: #fff;
+        }
+        .modal-content {
+          background: #020617;
+          color: #e5e7eb;
+          border-radius: 18px;
+          border: 1px solid rgba(148,163,184,0.25);
+        }
+        .modal-header {
+          border-bottom-color: rgba(31,41,55,0.8);
+        }
+        .modal-footer {
+          border-top-color: rgba(31,41,55,0.8);
+        }
+        .form-control,
+        .form-select {
+          background-color: #020617;
+          border-color: #1f2937;
+          color: #e5e7eb;
+          border-radius: 12px;
+        }
+        .form-control:focus,
+        .form-select:focus {
+          background-color: #020617;
+          border-color: #2563eb;
+          color: #fff;
+          box-shadow: 0 0 0 0.15rem rgba(37,99,235,0.35);
+        }
         .cotacao-row { margin-bottom: 8px; }
         .modal-lg { max-width: 900px; }
-        tr.clicavel { cursor:pointer; }
+        .footer {
+          background-color: #020617;
+          color: #9ca3af;
+          text-align: center;
+          padding: 10px 0;
+          position: fixed;
+          bottom: 0;
+          width: 100%;
+          border-top: 1px solid rgba(31,41,55,0.9);
+          font-size: 0.8rem;
+        }
     </style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="container mt-4">
+<div class="d-flex">
+  <aside class="sidebar">
+    <h4><i class="bi bi-cart3"></i> Portal de Compras</h4>
+    <a href="?route=produtos"><i class="bi bi-box-seam"></i> Produtos</a>
+    <a href="?route=fornecedor"><i class="bi bi-building"></i> Fornecedores</a>
+    <a href="?route=cotacoes" class="active"><i class="bi bi-receipt-cutoff"></i> Cotações</a>
+    <a href="?route=logout"><i class="bi bi-box-arrow-right"></i> Sair</a>
+  </aside>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>Cotações</h3>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCotacaoCriar">
-            Iniciar cotação
+  <main class="main-content">
+
+    <div class="top-bar d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h2 class="fw-semibold mb-0">
+            <i class="bi bi-receipt-cutoff"></i> Cotações
+          </h2>
+          <small class="text-muted">Acompanhe o status das cotações e visualize itens rapidamente.</small>
+        </div>
+
+        <button class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalCotacaoCriar">
+            <i class="bi bi-plus-circle"></i> Iniciar cotação
         </button>
     </div>
 
@@ -45,19 +222,19 @@ if (session_status() === PHP_SESSION_NONE) {
         </div>
     <?php endif; ?>
 
-    <div class="card">
+    <div class="card border-0" style="background-color:#111827; border-radius:14px;">
         <div class="card-body">
             <?php if (empty($cotacoes)): ?>
-                <p>Nenhuma cotação criada.</p>
+                <p class="mb-0">Nenhuma cotação criada.</p>
             <?php else: ?>
-                <table class="table table-striped align-middle">
+                <table class="table table-dark table-hover align-middle mb-0">
                     <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Fornecedor</th>
-                            <th>Data</th>
-                            <th>Status</th>
-                            <th>Resumo</th>
+                            <th><i class="bi bi-hash"></i></th>
+                            <th><i class="bi bi-building me-1"></i> Fornecedor</th>
+                            <th><i class="bi bi-calendar3 me-1"></i> Data</th>
+                            <th><i class="bi bi-flag me-1"></i> Status</th>
+                            <th><i class="bi bi-box2-heart me-1"></i> Resumo</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -74,11 +251,17 @@ if (session_status() === PHP_SESSION_NONE) {
                                 <td><?= htmlspecialchars($c['criado_em'] ?? ($c['data_cotacao'] ?? '')) ?></td>
                                 <td>
                                     <?php if (($c['status'] ?? '') === 'cancelada'): ?>
-                                        <span class="badge bg-danger">Cotação cancelada</span>
+                                        <span class="badge-status bg-danger-subtle text-danger">
+                                            <i class="bi bi-x-circle me-1"></i> Cotação cancelada
+                                        </span>
                                     <?php elseif (($c['status'] ?? '') === 'encerrada'): ?>
-                                        <span class="badge bg-success">Cotação encerrada</span>
+                                        <span class="badge-status bg-success-subtle text-success">
+                                            <i class="bi bi-check-circle me-1"></i> Cotação encerrada
+                                        </span>
                                     <?php else: ?>
-                                        <span class="badge bg-primary">Cotação aberta</span>
+                                        <span class="badge-status bg-primary-subtle text-primary">
+                                            <i class="bi bi-hourglass-split me-1"></i> Cotação aberta
+                                        </span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
@@ -105,6 +288,7 @@ if (session_status() === PHP_SESSION_NONE) {
         </div>
     </div>
 
+  </main>
 </div>
 
 <!-- Modal CRIAR cotação -->
@@ -115,7 +299,9 @@ if (session_status() === PHP_SESSION_NONE) {
         <input type="hidden" name="action" value="create">
 
         <div class="modal-header">
-          <h5 class="modal-title">Iniciar Cotação</h5>
+          <h5 class="modal-title">
+            <i class="bi bi-plus-circle me-2"></i> Iniciar Cotação
+          </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
 
@@ -133,7 +319,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
             <hr>
 
-            <h6>Produtos</h6>
+            <h6 class="mb-2"><i class="bi bi-boxes me-1"></i> Produtos</h6>
 
             <div id="itensWrapper">
 
@@ -154,21 +340,28 @@ if (session_status() === PHP_SESSION_NONE) {
                                    placeholder="Qtd" required>
                         </div>
                         <div class="col-2 d-flex align-items-center">
-                            <button type="button" class="btn btn-danger btn-sm remove-row">X</button>
+                            <button type="button" class="btn btn-danger btn-sm remove-row">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
 
             </div>
 
-            <button type="button" class="btn btn-secondary btn-sm mt-2" id="addProduto">
-                Adicionar produto
+            <button type="button" class="btn btn-secondary btn-sm mt-2 d-flex align-items-center gap-1" id="addProduto">
+                <i class="bi bi-plus-circle"></i> Adicionar produto
             </button>
 
         </div>
 
         <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Enviar Cotação</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="bi bi-x-circle"></i> Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send-check"></i> Enviar Cotação
+          </button>
         </div>
 
       </form>
@@ -189,6 +382,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
               <div class="modal-header">
                 <h5 class="modal-title">
+                    <i class="bi bi-receipt me-2"></i>
                     Cotação #<?= htmlspecialchars($idCot) ?> -
                     <?= htmlspecialchars($c['fornecedor_nome'] ?? ($c['nome'] ?? '-')) ?>
                 </h5>
@@ -204,19 +398,25 @@ if (session_status() === PHP_SESSION_NONE) {
                 <p>
                     <strong>Status atual:</strong>
                     <?php if (($c['status'] ?? '') === 'cancelada'): ?>
-                        <span class="badge bg-danger">Cotação cancelada</span>
+                        <span class="badge-status bg-danger-subtle text-danger">
+                            <i class="bi bi-x-circle me-1"></i> Cotação cancelada
+                        </span>
                     <?php elseif (($c['status'] ?? '') === 'encerrada'): ?>
-                        <span class="badge bg-success">Cotação encerrada</span>
+                        <span class="badge-status bg-success-subtle text-success">
+                            <i class="bi bi-check-circle me-1"></i> Cotação encerrada
+                        </span>
                     <?php else: ?>
-                        <span class="badge bg-primary">Cotação aberta</span>
+                        <span class="badge-status bg-primary-subtle text-primary">
+                            <i class="bi bi-hourglass-split me-1"></i> Cotação aberta
+                        </span>
                     <?php endif; ?>
                 </p>
 
                 <hr>
 
-                <h6>Produtos desta cotação</h6>
+                <h6 class="mb-2"><i class="bi bi-box-seam me-1"></i> Produtos desta cotação</h6>
 
-                <table class="table table-sm">
+                <table class="table table-sm table-dark align-middle mb-0">
                     <thead>
                         <tr>
                             <th>Produto</th>
@@ -251,8 +451,8 @@ if (session_status() === PHP_SESSION_NONE) {
                     <input type="hidden" name="action" value="update_status">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($idCot) ?>">
                     <input type="hidden" name="status" value="cancelada">
-                    <button type="submit" class="btn btn-outline-danger">
-                        Cancelar cotação
+                    <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-1">
+                        <i class="bi bi-x-octagon"></i> Cancelar cotação
                     </button>
                 </form>
 
@@ -261,8 +461,8 @@ if (session_status() === PHP_SESSION_NONE) {
                     <input type="hidden" name="action" value="update_status">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($idCot) ?>">
                     <input type="hidden" name="status" value="encerrada">
-                    <button type="submit" class="btn btn-success">
-                        Confirmar cotação
+                    <button type="submit" class="btn btn-success d-flex align-items-center gap-1">
+                        <i class="bi bi-check2-circle"></i> Confirmar cotação
                     </button>
                 </form>
               </div>
@@ -273,7 +473,11 @@ if (session_status() === PHP_SESSION_NONE) {
     <?php endforeach; ?>
 <?php endif; ?>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<footer class="footer">
+  <p>© 2025 Portal de Compras - Todos os direitos reservados</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 // adicionar linhas de produto
