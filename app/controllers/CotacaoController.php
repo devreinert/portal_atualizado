@@ -2,6 +2,9 @@
 require_once __DIR__ . '/../models/Cotacao.php';
 require_once __DIR__ . '/../../config/database.php';
 
+use Dompdf\Dompdf;
+use PHPMailer\PHPMailer\PHPMailer;
+
 class CotacaoController {
     public $model;
 
@@ -36,8 +39,7 @@ class CotacaoController {
         $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY descricao")
                        ->fetchAll(PDO::FETCH_ASSOC);
 
-        // disponibiliza variáveis para a view (index.php)
-        // $cotacoes, $itensPorCotacao, $fornecedores, $produtos
+        // disponibiliza variáveis para a view
         require_once __DIR__ . '/../../public/cotacoes.php';
     }
 
@@ -51,15 +53,13 @@ class CotacaoController {
         $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY descricao")
                        ->fetchAll(PDO::FETCH_ASSOC);
 
-        require_once __DIR__ . '/../views/cotacoes/create.php';
+        
+        require_once __DIR__ . '/../../public/cotacoes.php';
     }
 
     /**
-     * Salva uma nova cotação e seus itens (se informados)
-     * Espera POST com:
-     *  - fornecedor_id
-     *  - produto_id[] (array)
-     *  - quantidade[] (array)
+     * Salva uma nova cotação e seus itens
+     * e em seguida gera o PDF e envia por e-mail ao fornecedor
      */
     public function store() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -68,8 +68,8 @@ class CotacaoController {
         }
 
         $fornecedorId = $_POST['fornecedor_id'] ?? null;
-        $produtos = $_POST['produto_id'] ?? [];
-        $qtds = $_POST['quantidade'] ?? [];
+        $produtos     = $_POST['produto_id'] ?? [];
+        $qtds         = $_POST['quantidade'] ?? [];
 
         if (empty($fornecedorId)) {
             $_SESSION['flash_error'] = 'Fornecedor obrigatório.';
@@ -107,7 +107,11 @@ class CotacaoController {
 
             $db->commit();
             $_SESSION['flash_success'] = 'Cotação criada com sucesso.';
-        } catch (Exception $e) {
+
+            // 🔹 Após salvar no banco, tenta gerar PDF e enviar por e-mail
+            $this->enviarEmailCotacao($cotacaoId);
+
+        } catch (\Exception $e) {
             $db->rollBack();
             $_SESSION['flash_error'] = 'Erro ao criar cotação: ' . $e->getMessage();
         }
@@ -129,6 +133,7 @@ class CotacaoController {
 
         $itens = $this->model->itens($id);
 
+        // se algum dia for usar, ajuste o caminho da view
         require_once __DIR__ . '/../views/cotacoes/show.php';
     }
 
@@ -163,7 +168,7 @@ class CotacaoController {
             } elseif ($status === 'encerrada') {
                 $_SESSION['flash_success'] = 'Cotação encerrada.';
             }
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $_SESSION['flash_error'] = 'Erro ao atualizar cotação: ' . $e->getMessage();
         }
 
@@ -173,7 +178,6 @@ class CotacaoController {
 
     /**
      * Remove cotação e seus itens (se existir)
-     * (se ainda quiser manter a exclusão física)
      */
     public function delete($id) {
         $db = Database::connect();
@@ -189,7 +193,7 @@ class CotacaoController {
 
             $db->commit();
             $_SESSION['flash_success'] = 'Cotação removida.';
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $db->rollBack();
             $_SESSION['flash_error'] = 'Erro ao remover cotação: ' . $e->getMessage();
         }
@@ -197,5 +201,89 @@ class CotacaoController {
         header('Location: ?route=cotacoes');
         exit;
     }
+
+    /**
+     * Gera um PDF da cotação e envia por e-mail para o fornecedor
+     */
+    private function enviarEmailCotacao($cotacaoId)
+    {
+        try {
+            $db = Database::connect();
+
+            // Buscar dados da cotação
+            $cotacao = $this->model->find($cotacaoId);
+            if (!$cotacao) {
+                return;
+            }
+
+            // Itens da cotação
+            $itens = $this->model->itens($cotacaoId);
+
+            // Buscar fornecedor (usa coluna "email" da sua tabela)
+            $stmtForn = $db->prepare("SELECT nome_empresa, email FROM fornecedores WHERE id = ?");
+            $stmtForn->execute([$cotacao['fornecedor_id']]);
+            $fornecedor = $stmtForn->fetch(PDO::FETCH_ASSOC);
+
+            if (!$fornecedor || empty($fornecedor['email'])) {
+                $_SESSION['flash_error'] = 'Cotação criada, mas o fornecedor não possui e-mail cadastrado.';
+                return;
+            }
+
+            // Montar HTML do PDF usando o arquivo em /public/pdf_cotacao.php
+            $dadosCotacao    = $cotacao;
+            $dadosItens      = $itens;
+            $dadosFornecedor = $fornecedor;
+
+            ob_start();
+            include __DIR__ . '/../../public/pdf_cotacao.php';
+            $html = ob_get_clean();
+
+            // Gerar PDF
+            $dompdf = new Dompdf();
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+            $pdfOutput = $dompdf->output();
+
+            // Enviar e-mail
+            $mail = new PHPMailer(true);
+
+            // 🔧 CONFIGURE AQUI SEU SMTP
+            // 🔧 CONFIGURE AQUI SEU SMTP (MAILTRAP)
+          
+
+            $mail->isSMTP();
+            $mail->Host       = 'sandbox.smtp.mailtrap.io';
+            $mail->SMTPAuth   = true;
+            $mail->Username   = 'e5581940f77672';   // o seu Username do Mailtrap
+            $mail->Password   = '4c056948f79243';  // a sua Password do Mailtrap
+            $mail->Port       = 2525;               // <-- apenas UM número, use 2525
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // pode deixar assim
+            $mail->CharSet    = 'UTF-8';
+
+            
+            
+
+            $mail->setFrom('seu-email@seuprovedor.com', 'Portal de Compras');
+            $mail->addAddress($fornecedor['email'], $fornecedor['nome_empresa']);
+
+            $mail->Subject = 'Cotação #' . $cotacaoId;
+            $mail->Body    = "Olá {$fornecedor['nome_empresa']},\n\nSegue em anexo a cotação de número {$cotacaoId}.\n\nAtenciosamente,\nPortal de Compras";
+
+            // Anexar o PDF
+            $mail->addStringAttachment($pdfOutput, "cotacao_{$cotacaoId}.pdf");
+
+            $mail->send();
+
+            $_SESSION['flash_success'] =
+                ($_SESSION['flash_success'] ?? 'Cotação criada com sucesso.') .
+                ' E-mail enviado ao fornecedor.';
+
+        } catch (\Throwable $e) {
+            // Não quebra o fluxo; apenas informa o erro de envio
+            $_SESSION['flash_error'] =
+                'Cotação criada, mas ocorreu um erro ao gerar/enviar o e-mail: ' .
+                $e->getMessage();
+        }
+    }
 }
-?>
