@@ -1,40 +1,14 @@
 <?php
 // public/cotacoes.php
 
-// Evita chamar session_start() novamente
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Carrega o controller (que por sua vez carrega o model)
-require_once __DIR__ . '/../app/controllers/CotacaoController.php';
-
-// Instancia controller
-$controller = new CotacaoController();
-
-// Se a página for usada para salvar via query string action=store ou via POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST' || (isset($_GET['action']) && $_GET['action'] === 'store')) {
-    $controller->store();
-    exit;
-}
-
-// --- BUSCA DADOS PARA A VIEW ---
-// Use a propriedade pública model do controller (não $controller->$model)
-$cotacoes = $controller->model->all();
-
-// Para fornecedores/produtos usamos Database::connect() e aliasamos as colunas
-require_once __DIR__ . '/../app/models/Cotacao.php';
-require_once __DIR__ . '/../config/database.php';
-
-$db = Database::connect();
-
-// Fornecedores: seu schema tem 'nome_empresa' -> alias para 'nome' (compatibilidade com views)
-$fornecedores = $db->query("SELECT id, nome_empresa AS nome FROM fornecedores ORDER BY nome_empresa")
-                   ->fetchAll(PDO::FETCH_ASSOC);
-
-// Produtos: seu schema tem 'descricao' -> alias para 'nome'
-$produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY descricao")
-               ->fetchAll(PDO::FETCH_ASSOC);
+// Aqui NÃO instanciamos controller nem chamamos store/index,
+// isso já foi feito pelo routes/web.php + CotacaoController::index()
+// e as variáveis abaixo DEVEM vir do controller:
+// $cotacoes, $itensPorCotacao, $fornecedores, $produtos
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -45,6 +19,7 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
     <style>
         .cotacao-row { margin-bottom: 8px; }
         .modal-lg { max-width: 900px; }
+        tr.clicavel { cursor:pointer; }
     </style>
 </head>
 <body class="bg-light">
@@ -53,7 +28,9 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3>Cotações</h3>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCotacao">Iniciar cotação</button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCotacaoCriar">
+            Iniciar cotação
+        </button>
     </div>
 
     <?php if (!empty($_SESSION['flash_success'])): ?>
@@ -73,27 +50,47 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
             <?php if (empty($cotacoes)): ?>
                 <p>Nenhuma cotação criada.</p>
             <?php else: ?>
-                <table class="table table-striped">
+                <table class="table table-striped align-middle">
                     <thead>
                         <tr>
                             <th>#</th>
                             <th>Fornecedor</th>
                             <th>Data</th>
-                            <th>Itens</th>
+                            <th>Status</th>
+                            <th>Resumo</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($cotacoes as $c): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($c['id']) ?></td>
+                            <?php
+                                $idCot = $c['id'];
+                                $itens = $itensPorCotacao[$idCot] ?? [];
+                            ?>
+                            <tr class="clicavel"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalCotacaoDetalhe<?= $idCot ?>">
+                                <td><?= htmlspecialchars($idCot) ?></td>
                                 <td><?= htmlspecialchars($c['fornecedor_nome'] ?? ($c['nome'] ?? '-')) ?></td>
-                                <td><?= htmlspecialchars($c['criado_em'] ?? $c['data_cotacao'] ?? '') ?></td>
+                                <td><?= htmlspecialchars($c['criado_em'] ?? ($c['data_cotacao'] ?? '')) ?></td>
+                                <td>
+                                    <?php if (($c['status'] ?? '') === 'cancelada'): ?>
+                                        <span class="badge bg-danger">Cotação cancelada</span>
+                                    <?php elseif (($c['status'] ?? '') === 'encerrada'): ?>
+                                        <span class="badge bg-success">Cotação encerrada</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-primary">Cotação aberta</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <?php
-                                        $itens = $controller->model->itens($c['id']);
                                         if (!empty($itens)) {
-                                            foreach ($itens as $item) {
-                                                echo htmlspecialchars(($item['produto_nome'] ?? $item['nome'] ?? $item['descricao'] ?? '-')) . " x " . (int)$item['quantidade'] . "<br>";
+                                            $primeiro = $itens[0];
+                                            $nomeProd = $primeiro['produto_nome']
+                                                ?? ($primeiro['nome'] ?? ($primeiro['descricao'] ?? '-'));
+                                            $qtd = (int)($primeiro['quantidade'] ?? 0);
+                                            echo htmlspecialchars($nomeProd) . " x " . $qtd;
+                                            if (count($itens) > 1) {
+                                                echo " + " . (count($itens) - 1) . " item(ns)";
                                             }
                                         } else {
                                             echo '-';
@@ -110,11 +107,12 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
 
 </div>
 
-<!-- Modal criar cotação -->
-<div class="modal fade" id="modalCotacao" tabindex="-1">
+<!-- Modal CRIAR cotação -->
+<div class="modal fade" id="modalCotacaoCriar" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-    <form method="POST" action="?route=cotacoes">
+      <form method="POST" action="?route=cotacoes">
+        <input type="hidden" name="action" value="create">
 
         <div class="modal-header">
           <h5 class="modal-title">Iniciar Cotação</h5>
@@ -127,7 +125,9 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
             <select name="fornecedor_id" class="form-select" required>
                 <option value="">Selecione...</option>
                 <?php foreach ($fornecedores as $f): ?>
-                    <option value="<?= htmlspecialchars($f['id']) ?>"><?= htmlspecialchars($f['nome']) ?></option>
+                    <option value="<?= htmlspecialchars($f['id']) ?>">
+                        <?= htmlspecialchars($f['nome']) ?>
+                    </option>
                 <?php endforeach; ?>
             </select>
 
@@ -138,19 +138,22 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
             <div id="itensWrapper">
 
                 <div class="cotacao-row">
-                    <div class="row">
+                    <div class="row g-2">
                         <div class="col-7">
                             <select name="produto_id[]" class="form-select" required>
                                 <option value="">Selecione o produto...</option>
                                 <?php foreach ($produtos as $p): ?>
-                                    <option value="<?= htmlspecialchars($p['id']) ?>"><?= htmlspecialchars($p['nome']) ?></option>
+                                    <option value="<?= htmlspecialchars($p['id']) ?>">
+                                        <?= htmlspecialchars($p['nome']) ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-3">
-                            <input type="number" name="quantidade[]" min="1" class="form-control" placeholder="Qtd" required>
+                            <input type="number" name="quantidade[]" min="1" class="form-control"
+                                   placeholder="Qtd" required>
                         </div>
-                        <div class="col-2">
+                        <div class="col-2 d-flex align-items-center">
                             <button type="button" class="btn btn-danger btn-sm remove-row">X</button>
                         </div>
                     </div>
@@ -158,7 +161,9 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
 
             </div>
 
-            <button type="button" class="btn btn-secondary btn-sm mt-2" id="addProduto">Adicionar produto</button>
+            <button type="button" class="btn btn-secondary btn-sm mt-2" id="addProduto">
+                Adicionar produto
+            </button>
 
         </div>
 
@@ -171,21 +176,117 @@ $produtos = $db->query("SELECT id, descricao AS nome FROM produtos ORDER BY desc
   </div>
 </div>
 
+<?php if (!empty($cotacoes)): ?>
+    <?php foreach ($cotacoes as $c): ?>
+        <?php
+            $idCot = $c['id'];
+            $itens = $itensPorCotacao[$idCot] ?? [];
+        ?>
+        <!-- Modal DETALHE da cotação -->
+        <div class="modal fade" id="modalCotacaoDetalhe<?= $idCot ?>" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+
+              <div class="modal-header">
+                <h5 class="modal-title">
+                    Cotação #<?= htmlspecialchars($idCot) ?> -
+                    <?= htmlspecialchars($c['fornecedor_nome'] ?? ($c['nome'] ?? '-')) ?>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+
+              <div class="modal-body">
+                <p>
+                    <strong>Data:</strong>
+                    <?= htmlspecialchars($c['criado_em'] ?? ($c['data_cotacao'] ?? '')) ?>
+                </p>
+
+                <p>
+                    <strong>Status atual:</strong>
+                    <?php if (($c['status'] ?? '') === 'cancelada'): ?>
+                        <span class="badge bg-danger">Cotação cancelada</span>
+                    <?php elseif (($c['status'] ?? '') === 'encerrada'): ?>
+                        <span class="badge bg-success">Cotação encerrada</span>
+                    <?php else: ?>
+                        <span class="badge bg-primary">Cotação aberta</span>
+                    <?php endif; ?>
+                </p>
+
+                <hr>
+
+                <h6>Produtos desta cotação</h6>
+
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Quantidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($itens)): ?>
+                            <?php foreach ($itens as $item): ?>
+                                <tr>
+                                    <td>
+                                        <?= htmlspecialchars(
+                                            $item['produto_nome']
+                                            ?? ($item['nome'] ?? ($item['descricao'] ?? '-'))
+                                        ) ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($item['quantidade'] ?? '') ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="2">Nenhum item encontrado.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+              </div>
+
+              <div class="modal-footer">
+                <!-- Cancelar cotação -->
+                <form method="POST" action="?route=cotacoes" class="me-auto">
+                    <input type="hidden" name="action" value="update_status">
+                    <input type="hidden" name="id" value="<?= htmlspecialchars($idCot) ?>">
+                    <input type="hidden" name="status" value="cancelada">
+                    <button type="submit" class="btn btn-outline-danger">
+                        Cancelar cotação
+                    </button>
+                </form>
+
+                <!-- Confirmar cotação -->
+                <form method="POST" action="?route=cotacoes">
+                    <input type="hidden" name="action" value="update_status">
+                    <input type="hidden" name="id" value="<?= htmlspecialchars($idCot) ?>">
+                    <input type="hidden" name="status" value="encerrada">
+                    <button type="submit" class="btn btn-success">
+                        Confirmar cotação
+                    </button>
+                </form>
+              </div>
+
+            </div>
+          </div>
+        </div>
+    <?php endforeach; ?>
+<?php endif; ?>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-// adicionar linhas
+// adicionar linhas de produto
 document.getElementById("addProduto").addEventListener("click", function () {
     const wrapper = document.getElementById("itensWrapper");
     const row = wrapper.firstElementChild.cloneNode(true);
 
-    // reset values safely
     const sel = row.querySelector("select");
     if (sel) sel.selectedIndex = 0;
+
     const input = row.querySelector("input[type='number']");
     if (input) input.value = "";
 
-    // rebind remover
     const btn = row.querySelector(".remove-row");
     if (btn) {
         btn.addEventListener("click", function () {
@@ -197,7 +298,7 @@ document.getElementById("addProduto").addEventListener("click", function () {
     wrapper.appendChild(row);
 });
 
-// bind remover para a linha inicial
+// remover linha (inicial + clonadas)
 document.querySelectorAll(".remove-row").forEach(function(btn){
     btn.addEventListener("click", function () {
         const rows = document.querySelectorAll(".cotacao-row");
@@ -208,4 +309,3 @@ document.querySelectorAll(".remove-row").forEach(function(btn){
 
 </body>
 </html>
-

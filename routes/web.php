@@ -67,12 +67,20 @@ if (isset($_GET['route'])) {
 
             case 'cotacoes':
                 $controller = new CotacaoController();
-    
+            
                 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                    // qualquer POST em cotacoes chama o store()
-                    $controller->store();
+                    $action = $_POST['action'] ?? 'create';
+            
+                    switch ($action) {
+                        case 'create':
+                            $controller->store();
+                            break;
+            
+                        case 'update_status':
+                            $controller->updateStatus();
+                            break;
+                    }
                 } else {
-                    // GET mostra o CRUD/listagem
                     $controller->index();
                 }
                 break;

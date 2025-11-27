@@ -3,7 +3,6 @@ require_once __DIR__ . '/../models/Cotacao.php';
 require_once __DIR__ . '/../../config/database.php';
 
 class CotacaoController {
-    // Tornar público para compatibilidade com código que acessa $controller->model
     public $model;
 
     public function __construct() {
@@ -20,10 +19,16 @@ class CotacaoController {
         // pega todas as cotações via model
         $cotacoes = $this->model->all();
 
+        // monta array de itens de cada cotação (para os modais)
+        $itensPorCotacao = [];
+        foreach ($cotacoes as $c) {
+            $itensPorCotacao[$c['id']] = $this->model->itens($c['id']);
+        }
+
         // conecta para buscar fornecedores e produtos (aliasando colunas para 'nome')
         $db = Database::connect();
 
-        // fornecedores: nome_empresa -> nome (para manter compatibilidade com views)
+        // fornecedores: nome_empresa -> nome (para compatibilidade com views)
         $fornecedores = $db->query("SELECT id, nome_empresa AS nome FROM fornecedores ORDER BY nome_empresa")
                            ->fetchAll(PDO::FETCH_ASSOC);
 
@@ -32,6 +37,7 @@ class CotacaoController {
                        ->fetchAll(PDO::FETCH_ASSOC);
 
         // disponibiliza variáveis para a view (index.php)
+        // $cotacoes, $itensPorCotacao, $fornecedores, $produtos
         require_once __DIR__ . '/../../public/cotacoes.php';
     }
 
@@ -46,7 +52,6 @@ class CotacaoController {
                        ->fetchAll(PDO::FETCH_ASSOC);
 
         require_once __DIR__ . '/../views/cotacoes/create.php';
-        header("Location: ?route=cotacoes");
     }
 
     /**
@@ -61,53 +66,58 @@ class CotacaoController {
             header('Location: ?route=cotacoes');
             exit;
         }
-    
+
         $fornecedorId = $_POST['fornecedor_id'] ?? null;
         $produtos = $_POST['produto_id'] ?? [];
         $qtds = $_POST['quantidade'] ?? [];
-    
+
         if (empty($fornecedorId)) {
             $_SESSION['flash_error'] = 'Fornecedor obrigatório.';
             header('Location: ?route=cotacoes');
             exit;
         }
-    
+
         $db = Database::connect();
-    
+
         try {
             $db->beginTransaction();
-    
-            $stmt = $db->prepare("INSERT INTO cotacoes (fornecedor_id, criado_em) VALUES (?, NOW())");
+
+            // status inicial = 'aberta'
+            $stmt = $db->prepare(
+                "INSERT INTO cotacoes (fornecedor_id, status, criado_em) VALUES (?, 'aberta', NOW())"
+            );
             $stmt->execute([$fornecedorId]);
-    
+
             $cotacaoId = $db->lastInsertId();
-    
+
             if (!empty($produtos) && is_array($produtos)) {
-                $stmtItem = $db->prepare("INSERT INTO cotacao_itens (cotacao_id, produto_id, quantidade) VALUES (?, ?, ?)");
+                $stmtItem = $db->prepare(
+                    "INSERT INTO cotacao_itens (cotacao_id, produto_id, quantidade) VALUES (?, ?, ?)"
+                );
                 $count = max(count($produtos), count($qtds));
                 for ($i = 0; $i < $count; $i++) {
                     $pid = $produtos[$i] ?? null;
                     $qt  = $qtds[$i] ?? 0;
-    
+
                     if (!empty($pid) && (int)$qt > 0) {
                         $stmtItem->execute([$cotacaoId, $pid, (int)$qt]);
                     }
                 }
             }
-    
+
             $db->commit();
             $_SESSION['flash_success'] = 'Cotação criada com sucesso.';
         } catch (Exception $e) {
             $db->rollBack();
             $_SESSION['flash_error'] = 'Erro ao criar cotação: ' . $e->getMessage();
         }
-    
+
         header('Location: ?route=cotacoes');
         exit;
     }
 
     /**
-     * Exibe detalhes de uma cotação
+     * Exibe detalhes de uma cotação (se quiser usar em página separada)
      */
     public function show($id) {
         $cotacao = $this->model->find($id);
@@ -123,7 +133,47 @@ class CotacaoController {
     }
 
     /**
+     * Atualiza o status da cotação:
+     *  - cancelada  -> "Cotação cancelada"
+     *  - encerrada  -> "Cotação encerrada"
+     */
+    public function updateStatus() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: ?route=cotacoes');
+            exit;
+        }
+
+        $id     = $_POST['id']     ?? null;
+        $status = $_POST['status'] ?? null;
+
+        if (empty($id) || !in_array($status, ['cancelada', 'encerrada'])) {
+            $_SESSION['flash_error'] = 'Dados inválidos para atualizar cotação.';
+            header('Location: ?route=cotacoes');
+            exit;
+        }
+
+        $db = Database::connect();
+
+        try {
+            $stmt = $db->prepare("UPDATE cotacoes SET status = ? WHERE id = ?");
+            $stmt->execute([$status, $id]);
+
+            if ($status === 'cancelada') {
+                $_SESSION['flash_success'] = 'Cotação cancelada.';
+            } elseif ($status === 'encerrada') {
+                $_SESSION['flash_success'] = 'Cotação encerrada.';
+            }
+        } catch (Exception $e) {
+            $_SESSION['flash_error'] = 'Erro ao atualizar cotação: ' . $e->getMessage();
+        }
+
+        header('Location: ?route=cotacoes');
+        exit;
+    }
+
+    /**
      * Remove cotação e seus itens (se existir)
+     * (se ainda quiser manter a exclusão física)
      */
     public function delete($id) {
         $db = Database::connect();
@@ -131,11 +181,9 @@ class CotacaoController {
         try {
             $db->beginTransaction();
 
-            // remover itens
             $stmt = $db->prepare("DELETE FROM cotacao_itens WHERE cotacao_id = ?");
             $stmt->execute([$id]);
 
-            // remover cotação
             $stmt2 = $db->prepare("DELETE FROM cotacoes WHERE id = ?");
             $stmt2->execute([$id]);
 
